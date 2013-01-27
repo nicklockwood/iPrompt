@@ -159,12 +159,7 @@
                 }
                 else if ([label.text isEqualToString:alertView.message])
                 {
-                    
-#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_6_0
                     label.lineBreakMode = NSLineBreakByWordWrapping;
-#else
-                    label.lineBreakMode = UILineBreakModeWordWrap;
-#endif
                     label.numberOfLines = 0;
                     label.alpha = 1.0f;
                     [label sizeToFit];

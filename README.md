@@ -1,15 +1,15 @@
 Purpose
 --------------
 
-iPrompt is a library to help you schedule in-app notifications or user prompts based on installed time and usage of your app.
+iPrompt is a library for iOS to help you schedule in-app notifications or user prompts based on installed time and usage of your app. It is ideal for implementing "upgrade to pro version" alerts for "lite" or trial versions of apps.
 
 
 Supported OS & SDK Versions
 -----------------------------
 
-* Supported build target - iOS 6.0 / Mac OS 10.8 (Xcode 4.5, Apple LLVM compiler 4.1)
-* Earliest supported deployment target - iOS 5.0 / Mac OS 10.7
-* Earliest compatible deployment target - iOS 4.3 / Mac OS 10.6
+* Supported build target - iOS 6.0 (Xcode 4.5, Apple LLVM compiler 4.1)
+* Earliest supported deployment target - iOS 5.0
+* Earliest compatible deployment target - iOS 4.3
 
 NOTE: 'Supported' means that the library has been tested with this version. 'Compatible' means that the library should work on this OS version (i.e. it doesn't rely on any unavailable SDK features) but is no longer being tested for compatibility and may require tweaking or bug fixes to run correctly.
 
@@ -143,7 +143,7 @@ The following properties are used for debugging purposes and/or for controlling 
     
     @property (nonatomic, assign) BOOL disableAlertViewResizing;
     
-On iOS, iPrompt includes some logic to resize the alert view to ensure that your prompt message is visible in both portrait and landscape mode, and that it doesn't scroll or become truncated. The code to do this is a rather nasty hack, so if your alert text is very short and/or your app only needs to function in portrait mode on iPhone, you may wish to set this property to YES, which may help make your app more robust against future iOS updates.
+iPrompt includes some logic to resize the alert view to ensure that your prompt message is visible in both portrait and landscape mode, and that it doesn't scroll or become truncated. The code to do this is a rather nasty hack, so if your alert text is very short and/or your app only needs to function in portrait mode on iPhone, you may wish to set this property to YES, which may help make your app more robust against future iOS updates.
     
     @property (nonatomic, assign) BOOL verboseLogging;
     
