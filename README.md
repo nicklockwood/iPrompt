@@ -1,7 +1,7 @@
 Purpose
 --------------
 
-iPrompt is a library for iOS to help you schedule in-app notifications or user prompts based on installed time and usage of your app. It is ideal for implementing "upgrade to pro version" alerts for "lite" or trial versions of apps.
+iPrompt is a library for iOS to help you schedule in-app notifications or prompts based on installed time and usage of your app. It is ideal for implementing "upgrade to pro version" alerts for "lite" or trial versions of apps.
 
 
 Supported OS & SDK Versions
@@ -80,6 +80,10 @@ Returns all existing prompts.
     + (void)addPrompt:(iPrompt *)prompt;
     
 Add a new prompt to the application.
+
+    + (iPrompt *)defaults;
+    
+This is a global prompt object used to set the defaults for all prompts. Any values set on this object will be applied to all other prompt instances unless they explicitly override the values. You can configure the defaults with the iPrompt.plist by adding a prompt dictionary with the key "defaults".
     
     - (id)initWithName:(NSString *)name;
     
@@ -87,11 +91,15 @@ Initialise a prompt by name, which is the minimum required configuration. To con
     
     - (id)initWithDictionary:(NSDictionary *)dict;
     
-Initialise a prompt using a dictionary of settings, following the formst defined in the iPrompt.plist specification above.
+Initialise a prompt using a dictionary of settings. The key names match the properties defined below.
+ 
+    - (void)setWithDictionary:(NSDictionary *)dict;
+    
+This is a convenience method that can be used to set the properties for an existing prompt object from a dictionary of values after it has been created.
  
  
-Properties
---------------
+Configuration Properties
+----------------------
 
 Each prompt has the following configurable properties:
 
@@ -113,11 +121,15 @@ This is the label for the action button in the alert. If not set, the action but
 
     @property (nonatomic, copy) NSString *remindButtonLabel;
     
-This is the label for the "remind me later" button in the alert. If not set, the button label will default to "Remind Me Later". If you wish to disable the remind button, set this to an empty string.
+This is the label for the "remind me later" button in the alert. If not set, the button label will default to "Remind Me Later". If you wish to disable the remind button, set this to an empty string. If the user presses the remind button on a prompt, it will not be shown again until the remind period has passed..
+    
+    @property (nonatomic, copy) NSString *cancelButtonLabel;
+    
+This is the label for the cancel button in the alert. If not set, the cancel button will be hidden. If you wish to enable the cancel button, set this to a non-empty string. If the user presses the cancel button on a prompt, it will never be displayed again even if it is marked as recurring.
     
     @property (nonatomic, strong) NSURL *actionURL;
     
-This is a URL that will be opened when the user presses the action button in the alert (required).
+This is a URL that will be opened when the user presses the action button in the alert. If not set, the action button will close the alert without performing any further function (although you can still detect and react to this event using the delegate).
     
     @property (nonatomic, assign) NSUInteger usesUntilPrompt;
     
@@ -133,17 +145,17 @@ This is the number of days (floating point) after pressing the "remind me" butto
     
     @property (nonatomic, assign, getter = isRecurring) BOOL recurring;
     
-This is a boolean indicating whether the prompt should reccur after the first time it has been either actioned or dismissed. Defaults to NO.
-    
+This is a boolean indicating whether the prompt should reccur after the action button has been pressed. Defaults to NO.
 
-Advanced properties
-----------------------
-
-The following properties are used for debugging purposes and/or for controlling how the prompt is displayed in the application.
-    
     @property (nonatomic, assign) BOOL disableAlertViewResizing;
     
 iPrompt includes some logic to resize the alert view to ensure that your prompt message is visible in both portrait and landscape mode, and that it doesn't scroll or become truncated. The code to do this is a rather nasty hack, so if your alert text is very short and/or your app only needs to function in portrait mode on iPhone, you may wish to set this property to YES, which may help make your app more robust against future iOS updates.
+
+
+Debugging properties
+----------------------
+
+The following properties are used for debugging purposes:
     
     @property (nonatomic, assign) BOOL verboseLogging;
     
@@ -152,3 +164,59 @@ This option will cause iPrompt to send detailed logs to the console about the pr
     @property (nonatomic, assign) BOOL previewMode;
     
 If set to YES, iPrompt will always display the rating prompt on launch, regardless of how long the app has been in use or whether it's the latest version. Use this to proofread your message and check your configuration is correct during testing, but disable it for the final release (defaults to NO).
+
+
+Advanced properties
+--------------
+
+If the default iPrompt configuration options don't meet your requirements, you can implement your own logic by using the advanced properties, methods and delegate. The properties below let you access internal state and override it. You would not normally configure these properties using the iPrompt.plist.
+
+    @property (nonatomic, strong) NSDate *firstUsed;
+
+The first date on which the user launched the app. This is used to calculate whether the daysUntilPrompt criterion has been met.
+
+    @property (nonatomic, strong) NSDate *lastReminded;
+
+The date on which the user last requested to be reminded about a prompt.
+
+    @property (nonatomic, assign) NSUInteger usesCount;
+
+The number of times the app has been used (launched) since it was installed.
+
+    @property (nonatomic, assign, getter = isViewed) BOOL viewed;
+
+This flag indicates whether the user has already pressed the prompt action button (view the prompt). If this is set to YES, the prompt will never be shown again. Note that if the `recurring` property is set to YES, pressing the prompt action will merely reset the `lastReminded` date, and will not set `viewed` to YES.
+
+    @property (nonatomic, assign, getter = isCancelled) BOOL cancelled;
+
+This flag indicates whether the user has declined this prompt by pressing the Cancel button. If the user has declined the prompt, it will never be shown again even if `recurring` is set to YES.
+
+    @property (nonatomic, weak_delegate) id<iPromptDelegate> delegate;
+
+An object you have supplied that implements the `iPromptDelegate` protocol, documented below. Use this to detect and/or override iPrompt's default behaviour. This defaults to the App Delegate, so if you are using your App Delegate as your iPrompt delegate, you don't need to set this property.
+
+
+Delegate methods
+---------------
+
+The iPromptDelegate protocol provides the following methods that can be used intercept iPrompt events and override the default behaviour. All methods are optional.
+
+    - (BOOL)iPromptShouldDisplayPrompt:(iPrompt *)prompt;
+    
+This method is called immediately before the prompt is displayed to the user. You can use this method to implement custom prompt logic. You can also use this method to block the standard prompt alert and display the prompt in a different way, or bypass it altogether.
+    
+    - (BOOL)iPromptShouldOpenActionURL:(iPrompt *)prompt;
+    
+This method is called when the user pressed the action button, before the URL is opened. You can use this method to intercept an action URL and perform some other behaviour, such as loading a native view controller.
+    
+    - (void)iPromptUserDidPressActionButton:(iPrompt *)prompt;
+    
+This method is called after the user presses the action button, but before the action URL is opened. This is useful if you want to log user interaction with iPrompt. This method is only called if you are using the standard iPrompt alert view prompt and will not be called automatically if you provide a custom alert implementation by implementing the `iPromptShouldDisplayPrompt:` method and returning NO.
+    
+    - (void)iPromptUserDidPressRemindButton:(iPrompt *)prompt;
+    
+This method is called after the user presses the remind button. This is useful if you want to log user interaction with iPrompt. This method is only called if you are using the standard iPrompt alert view prompt and will not be called automatically if you provide a custom alert implementation by implementing the `iPromptShouldDisplayPrompt:` method and returning NO.
+    
+    - (void)iPromptUserDidPressCancelButton:(iPrompt *)prompt;
+    
+This method is called after the user presses the cancel button. This is useful if you want to log user interaction with iPrompt. This method is only called if you are using the standard iPrompt alert view prompt and will not be called automatically if you provide a custom alert implementation by implementing the `iPromptShouldDisplayPrompt:` method and returning NO.

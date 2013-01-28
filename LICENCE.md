@@ -1,6 +1,6 @@
 iPrompt
 
-Version 1.0, December 6th, 2012
+Version 1.1, January 28th, 2013
 
 Copyright (C) 2012 Charcoal Design
 

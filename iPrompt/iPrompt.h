@@ -1,7 +1,7 @@
 //
 //  iPrompt.h
 //
-//  Version 1.0
+//  Version 1.1 beta
 //
 //  Created by Nick Lockwood on 06/12/2012.
 //  Copyright 2012 Charcoal Design
@@ -31,6 +31,15 @@
 //
 
 
+#import <Availability.h>
+#undef weak_delegate
+#if __has_feature(objc_arc_weak)
+#define weak_delegate weak
+#else
+#define weak_delegate unsafe_unretained
+#endif
+
+
 #ifdef __IPHONE_OS_VERSION_MAX_ALLOWED
 #import <UIKit/UIKit.h>
 #else
@@ -38,15 +47,35 @@
 #endif
 
 
+static NSString *iPromptDefaultsKey = @"defaults";
+
+
+@class iPrompt;
+
+
+@protocol iPromptDelegate <NSObject>
+@optional
+
+- (BOOL)iPromptShouldDisplayPrompt:(iPrompt *)prompt;
+- (BOOL)iPromptShouldOpenActionURL:(iPrompt *)prompt;
+- (void)iPromptUserDidPressActionButton:(iPrompt *)prompt;
+- (void)iPromptUserDidPressRemindButton:(iPrompt *)prompt;
+- (void)iPromptUserDidPressCancelButton:(iPrompt *)prompt;
+
+@end
+
+
 @interface iPrompt: NSObject
 
 //prompt management
 + (NSDictionary *)allPrompts;
 + (void)addPrompt:(iPrompt *)prompt;
++ (iPrompt *)defaults;
 
-//create prompt
+//intialize and configure prompt
 - (id)initWithName:(NSString *)name;
 - (id)initWithDictionary:(NSDictionary *)dict;
+- (void)setWithDictionary:(NSDictionary *)dict;
 
 //unique prompt name
 @property (nonatomic, copy, readonly) NSString *name;
@@ -56,17 +85,26 @@
 @property (nonatomic, copy) NSString *message;
 @property (nonatomic, copy) NSString *actionButtonLabel;
 @property (nonatomic, copy) NSString *remindButtonLabel;
+@property (nonatomic, copy) NSString *cancelButtonLabel;
 @property (nonatomic, strong) NSURL *actionURL;
 
-//usage settings - these have sensible defaults
+//usage settings
 @property (nonatomic, assign) NSUInteger usesUntilPrompt;
 @property (nonatomic, assign) float daysUntilPrompt;
 @property (nonatomic, assign) float remindPeriod;
-
-//debugging and notification overrides
 @property (nonatomic, assign, getter = isRecurring) BOOL recurring;
+
+//debugging and prompt overrides
 @property (nonatomic, assign) BOOL disableAlertViewResizing;
 @property (nonatomic, assign) BOOL verboseLogging;
 @property (nonatomic, assign) BOOL previewMode;
+
+//advanced properties for implementing custom behaviour
+@property (nonatomic, strong) NSDate *firstUsed;
+@property (nonatomic, strong) NSDate *lastReminded;
+@property (nonatomic, assign) NSUInteger usesCount;
+@property (nonatomic, assign, getter = isViewed) BOOL viewed;
+@property (nonatomic, assign, getter = isCancelled) BOOL cancelled;
+@property (nonatomic, weak_delegate) id<iPromptDelegate> delegate;
 
 @end

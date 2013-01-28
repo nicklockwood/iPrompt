@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>upgrade</key>
+	<dict>
+		<key>title</key>
+		<string>Upgrade to Full Version</string>
+		<key>message</key>
+		<string>Upgrade to the full version of Rainbow Blocks because it&apos;s awesome!</string>
+		<key>actionURL</key>
+		<string>http://itunes.apple.com/app/id355313284</string>
+		<key>actionButton</key>
+		<string>Upgrade</string>
+		<key>remindButton</key>
+		<string>Later</string>
+		<key>cancelButton</key>
+		<string>Cancel</string>
+		<key>remindPeriod</key>
+		<integer>0</integer>
+		<key>daysUntilPrompt</key>
+		<integer>0</integer>
+		<key>usesUntilPrompt</key>
+		<string>1</string>
+		<key>recurring</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

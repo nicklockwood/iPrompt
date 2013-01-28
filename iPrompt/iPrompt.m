@@ -1,7 +1,7 @@
 //
 //  iPrompt.m
 //
-//  Version 1.0
+//  Version 1.1 beta
 //
 //  Created by Nick Lockwood on 06/12/2012.
 //  Copyright 2012 Charcoal Design
@@ -33,6 +33,12 @@
 #import "iPrompt.h"
 
 
+#import <Availability.h>
+#if !__has_feature(objc_arc)
+#error This class requires automatic reference counting
+#endif
+
+
 #define SECONDS_IN_A_DAY 86400.0
 
 
@@ -40,6 +46,14 @@
 
 @property (nonatomic, strong) id visibleAlert;
 @property (nonatomic, assign) int previousOrientation;
+
+@property (nonatomic, strong) NSNumber *usesUntilPromptNumber;
+@property (nonatomic, strong) NSNumber *daysUntilPromptNumber;
+@property (nonatomic, strong) NSNumber *remindPeriodNumber;
+@property (nonatomic, strong) NSNumber *recurringNumber;
+@property (nonatomic, strong) NSNumber *disableAlertViewResizingNumber;
+@property (nonatomic, strong) NSNumber *verboseLoggingNumber;
+@property (nonatomic, strong) NSNumber *previewModeNumber;
 
 @end
 
@@ -61,10 +75,17 @@
         NSDictionary *dict = [NSDictionary dictionaryWithContentsOfFile:path];
         for (NSString *name in dict)
         {
-            NSMutableDictionary *promptDict = [dict[name] mutableCopy];
-            promptDict[@"name"] = name;
-            iPrompt *prompt = [[iPrompt alloc] initWithDictionary:promptDict];
-            [self performSelectorOnMainThread:@selector(addPrompt:) withObject:prompt waitUntilDone:NO];
+            if ([name isEqualToString:iPromptDefaultsKey])
+            {
+                [[self defaults] setWithDictionary:dict];
+            }
+            else
+            {
+                NSMutableDictionary *promptDict = [dict[name] mutableCopy];
+                promptDict[@"name"] = name;
+                iPrompt *prompt = [[iPrompt alloc] initWithDictionary:promptDict];
+                [self performSelectorOnMainThread:@selector(addPrompt:) withObject:prompt waitUntilDone:NO];
+            }
         }
     }
     return allPrompts;
@@ -94,25 +115,34 @@
     [prompt performSelectorOnMainThread:@selector(applicationLaunched) withObject:nil waitUntilDone:NO];
 }
 
++ (iPrompt *)defaults
+{
+    static iPrompt *defaults = nil;
+    if (defaults == nil)
+    {
+        defaults = [[iPrompt alloc] initWithName:iPromptDefaultsKey];
+        defaults.actionButtonLabel = @"OK";
+        defaults.remindButtonLabel = @"Remind Me Later";
+        defaults.usesUntilPrompt = 10;
+        defaults.daysUntilPrompt = 10.0f;
+        defaults.remindPeriod = 1.0f;
+        
+#ifdef DEBUG
+        
+        //enable verbose logging in debug mode
+        defaults.verboseLogging = YES;
+        
+#endif
+        
+    }
+    return defaults;
+}
+
 - (id)initWithName:(NSString *)name
 {
     if ((self = [super init]))
     {
         _name = [name copy];
-        _actionButtonLabel = @"OK";
-        _remindButtonLabel = @"Remind Me Later";
-        _usesUntilPrompt = 10;
-        _daysUntilPrompt = 10.0f;
-        _remindPeriod = 1.0f;
-        _recurring = NO;
-        
-#ifdef DEBUG
-        
-        //enable verbose logging in debug mode
-        self.verboseLogging = YES;
-        
-#endif
-
     }
     return self;
 }
@@ -121,18 +151,155 @@
 {
     if ((self = [self initWithName:dict[@"name"]]))
     {
-        self.title = dict[@"title"];
-        self.message = dict[@"message"];
-        self.actionButtonLabel = dict[@"actionButton"] ?: self.actionButtonLabel;
-        self.remindButtonLabel = dict[@"remindButton"] ?: self.remindButtonLabel;
-        self.actionURL = [NSURL URLWithString:dict[@"actionURL"]];
-        self.usesUntilPrompt = [dict[@"usesUntilPrompt"] ?: @(self.usesUntilPrompt) integerValue];
-        self.daysUntilPrompt = [dict[@"daysUntilPrompt"] ?: @(self.daysUntilPrompt) floatValue];
-        self.remindPeriod = [dict[@"remindPeriod"] ?: @(self.remindPeriod) floatValue];
-        self.recurring = [dict[@"recurring"] boolValue];
+        [self setWithDictionary:dict];
     }
     return self;
 }
+
+- (void)setWithDictionary:(NSDictionary *)dict
+{
+    for (NSString *key in dict)
+    {
+        if ([key isEqualToString:@"actionURL"])
+        {
+            self.actionURL = [NSURL URLWithString:dict[@"actionURL"]] ?: self.actionURL;
+        }
+        else if ([key isEqualToString:@"actionButton"])
+        {
+            self.actionButtonLabel = dict[key];
+        }
+        else if ([key isEqualToString:@"remindButton"])
+        {
+            self.remindButtonLabel = dict[key];
+        }
+        else if ([key isEqualToString:@"cancelButton"])
+        {
+            self.cancelButtonLabel = dict[key];
+        }
+        else
+        {
+            NSString *setter = [NSString stringWithFormat:@"set%@%@:",
+                                [[key substringToIndex:1] uppercaseString],
+                                [key substringFromIndex:1]];
+            
+            if ([self respondsToSelector:NSSelectorFromString(setter)])
+            {
+                [self setValue:dict[key] forKey:key];
+            }
+        }
+    }
+}
+
+- (id)defaultValueForKey:(NSString *)key
+{
+    return (self == [iPrompt defaults])? nil: [[iPrompt defaults] valueForKey:key];
+}
+
+- (NSString *)title
+{
+    return _title ?: [self defaultValueForKey:@"title"];
+}
+
+- (NSString *)message
+{
+    return _message ?: [self defaultValueForKey:@"message"];
+}
+
+- (NSString *)actionButtonLabel
+{
+    return _actionButtonLabel ?: [self defaultValueForKey:@"actionButtonLabel"];
+}
+
+- (NSString *)remindButtonLabel
+{
+    return _remindButtonLabel ?: [self defaultValueForKey:@"remindButtonLabel"];
+}
+
+- (NSString *)cancelButtonLabel
+{
+    return _cancelButtonLabel ?: [self defaultValueForKey:@"cancelButtonLabel"];
+}
+
+- (NSURL *)actionURL
+{
+    return _actionURL ?: [self defaultValueForKey:@"actionURL"];
+}
+
+- (NSUInteger)usesUntilPrompt
+{
+    return [_usesUntilPromptNumber ?: [self defaultValueForKey:@"usesUntilPromptNumber"] integerValue];
+}
+
+- (void)setUsesUntilPrompt:(NSUInteger)usesUntilPrompt
+{
+    _usesUntilPromptNumber = @(usesUntilPrompt);
+}
+
+- (float)daysUntilPrompt
+{
+    return [_daysUntilPromptNumber ?: [self defaultValueForKey:@"daysUntilPromptNumber"] floatValue];
+}
+
+- (void)setDaysUntilPrompt:(float)daysUntilPrompt
+{
+    _daysUntilPromptNumber = @(daysUntilPrompt);
+}
+
+- (float)remindPeriod
+{
+    return [_remindPeriodNumber ?: [self defaultValueForKey:@"remindPeriodNumber"] integerValue];
+}
+
+- (void)setRemindPeriod:(float)remindPeriod
+{
+    _remindPeriodNumber = @(remindPeriod);
+}
+
+- (BOOL)isRecurring
+{
+    return [_recurringNumber ?: [self defaultValueForKey:@"recurringNumber"] boolValue];
+}
+
+- (void)setRecurring:(BOOL)recurring
+{
+    _recurringNumber = @(recurring);
+}
+
+- (BOOL)disableAlertViewResizing
+{
+    return [_disableAlertViewResizingNumber ?: [self defaultValueForKey:@"disableAlertViewResizingNumber"] boolValue];
+}
+
+- (void)setDisableAlertViewResizing:(BOOL)disableAlertViewResizing
+{
+    _disableAlertViewResizingNumber = @(disableAlertViewResizing);
+}
+
+- (BOOL)verboseLogging
+{
+    return [_verboseLoggingNumber ?: [self defaultValueForKey:@"verboseLoggingNumber"] boolValue];
+}
+
+- (void)setVerboseLogging:(BOOL)verboseLogging
+{
+    _verboseLoggingNumber = @(verboseLogging);
+}
+
+- (BOOL)previewMode
+{
+    return [_previewModeNumber ?: [self defaultValueForKey:@"previewModeNumber"] boolValue];
+}
+
+- (void)setPreviewMode:(BOOL)previewMode
+{
+    _previewModeNumber = @(previewMode);
+}
+
+- (id<iPromptDelegate>)delegate
+{
+    return _delegate ?: [self defaultValueForKey:@"delegate"] ?: [UIApplication sharedApplication].delegate;
+}
+
 
 - (void)resizeAlertView:(UIAlertView *)alertView
 {
@@ -250,16 +417,6 @@
     [self setDefaultsObject:date forKey:@"lastReminded"]; 
 }
 
-- (BOOL)viewed
-{
-    return [[self defaultsObjectForKey:@"viewed"] boolValue];
-}
-
-- (void)setViewed:(BOOL)viewed
-{
-    [self setDefaultsObject:@(viewed) forKey:@"viewed"];
-}
-
 - (NSUInteger)usesCount
 {
     return [[self defaultsObjectForKey:@"usesCount"] integerValue];
@@ -275,6 +432,26 @@
     self.usesCount ++;
 }
 
+- (BOOL)isViewed
+{
+    return [[self defaultsObjectForKey:@"viewed"] boolValue];
+}
+
+- (void)setViewed:(BOOL)viewed
+{
+    [self setDefaultsObject:@(viewed) forKey:@"viewed"];
+}
+
+- (BOOL)isCancelled
+{
+    return [[self defaultsObjectForKey:@"cancelled"] boolValue];
+}
+
+- (void)setCancelled:(BOOL)cancelled
+{
+    [self setDefaultsObject:@(cancelled) forKey:@"cancelled"];
+}
+
 - (BOOL)shouldPrompt
 {
     //preview mode?
@@ -285,7 +462,14 @@
     }
     
     //already viewed?
-    if (self.viewed)
+    else if (self.cancelled)
+    {
+        NSLog(@"iPrompt did not display the \"%@\" prompt because it has already been viewed", _name);
+        return NO;
+    }
+    
+    //already viewed?
+    else if (self.viewed)
     {
         NSLog(@"iPrompt did not display the \"%@\" prompt because it has already been viewed", _name);
         return NO;
@@ -321,6 +505,16 @@
         return NO;
     }
     
+    //check delegate
+    else if ([self.delegate respondsToSelector:@selector(iPromptShouldDisplayPrompt:)] && ![self.delegate iPromptShouldDisplayPrompt:self])
+    {
+        if (self.verboseLogging)
+        {
+            NSLog(@"iPrompt did not display the \"%@\" prompt because the delegate returned NO from the iPromptShouldDisplayPrompt: method", self.name);
+        }
+        return NO;
+    }
+    
     //lets prompt!
     return YES;
 }
@@ -332,7 +526,7 @@
         UIAlertView *alert = [[UIAlertView alloc] initWithTitle:self.title
                                                         message:self.message
                                                        delegate:self
-                                              cancelButtonTitle:nil
+                                              cancelButtonTitle:self.cancelButtonLabel
                                               otherButtonTitles:self.actionButtonLabel, nil];
         if ([self.remindButtonLabel length])
         {
@@ -346,10 +540,28 @@
 
 - (void)alertView:(UIAlertView *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex
 {
-    if (buttonIndex == 1)
+    if (buttonIndex == alertView.cancelButtonIndex)
+    {
+        //ignore this prompt
+        self.viewed = YES;
+
+        //log event
+        if ([self.delegate respondsToSelector:@selector(iPromptUserDidPressCancelButton:)])
+        {
+            [self.delegate iPromptUserDidPressCancelButton:self];
+        }
+    }
+    else if (([self.cancelButtonLabel length] && buttonIndex == 2) ||
+             ([self.cancelButtonLabel length] == 0 && buttonIndex == 1))
     {
         //remind later
         self.lastReminded = [NSDate date];
+        
+        //log event
+        if ([self.delegate respondsToSelector:@selector(iPromptUserDidPressRemindButton:)])
+        {
+            [self.delegate iPromptUserDidPressRemindButton:self];
+        }
     }
     else
     {
@@ -364,8 +576,29 @@
             self.viewed = YES;
         }
         
-        //call action
-        [[UIApplication sharedApplication] openURL:self.actionURL];
+        //log event
+        if ([self.delegate respondsToSelector:@selector(iPromptUserDidPressActionButton:)])
+        {
+            [self.delegate iPromptUserDidPressActionButton:self];
+        }
+        
+        //open action URL
+        if (self.actionURL)
+        {
+            if (![self.delegate respondsToSelector:@selector(iPromptShouldOpenActionURL:)] || [self.delegate iPromptShouldOpenActionURL:self])
+            {
+                if (self.verboseLogging)
+                {
+                    NSLog(@"iPrompt will open the action URL \"%@\" for the \"%@\" prompt", self.actionURL, self.name);
+                }
+                
+                [[UIApplication sharedApplication] openURL:self.actionURL];
+            }
+            else
+            {
+                NSLog(@"iPrompt did not open the action URL for the \"%@\" prompt because the delegate returned NO from the iPromptShouldOpenActionURL: method", self.name);
+            }
+        }
     }
     
     //release alert
@@ -375,9 +608,9 @@
 - (void)applicationLaunched
 {
     //set first launch date
-    if (![self defaultsObjectForKey:@"firstUsed"])
+    if (!self.firstUsed)
     {
-        [self setDefaultsObject:[NSDate date] forKey:@"firstUsed"];
+        self.firstUsed = [NSDate date];
     }
     
     [self incrementUseCount];
